@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>Video Receiver</title>
+  <link href="./styles/base.css" rel="stylesheet">
+  <style>
+    .status {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 4px;
+    }
+    .status.connected {
+      background-color: #dff0d8;
+      color: #3c763d;
+    }
+    .status.disconnected {
+      background-color: #f2dede;
+      color: #a94442;
+    }
+    .status.connecting {
+      background-color: #fcf8e3;
+      color: #8a6d3b;
+    }
+  </style>
+</head>
+<body>
+<h1>mp4 file -> FFmpeg -- TCP -> Node.js -- WebSocket -> Receiver</h1>
+<pre style="white-space: pre-wrap">
+        .\ffmpeg.exe -re -stream_loop -1 -i sd.mp4 -vcodec libvpx -b:v 3500k -r 25 -crf 10 -quality realtime -speed 16 -threads 8 -an -g 25 -f webm tcp://localhost:9090
+    </pre>
+
+<div id="status" class="status disconnected">Connection Status: Disconnected</div>
+
+<video
+    controls
+    height="480"
+    width="640"
+    id="video"
+    muted
+    style="outline: 1px solid"
+></video>
+
+<script>
+  (function() {
+    // Configuration
+    const CONFIG = {
+      codecString: 'video/webm; codecs="vp8"',
+      wsRetryInterval: 3000, // 重连间隔时间（毫秒）
+      maxRetries: 5 // 最大重试次数
+    };
+
+    // State management
+    const state = {
+      wsRetries: 0,
+      isConnecting: false,
+      ws: null,
+      mediaSource: null,
+      sourceBuffer: null,
+      queue: [],
+      lastVideoTime: 0
+    };
+
+    // DOM Elements
+    const elements = {
+      video: document.getElementById('video'),
+      status: document.getElementById('status')
+    };
+
+    // Update connection status UI
+    function updateStatus(status, message) {
+      elements.status.className = `status ${status}`;
+      elements.status.textContent = `Connection Status: ${message}`;
+    }
+
+    // Buffer management
+    function updateBuffer() {
+      if (state.queue.length > 0 && !state.sourceBuffer.updating) {
+        state.sourceBuffer.appendBuffer(state.queue.shift());
+      }
+    }
+
+    // WebSocket connection management
+    function initWebSocket() {
+      if (state.isConnecting) return;
+
+      state.isConnecting = true;
+      updateStatus('connecting', 'Connecting...');
+
+      const wsUrl = `ws://${window.location.hostname}:${window.location.port}`;
+      state.ws = new WebSocket(wsUrl);
+      state.ws.binaryType = "arraybuffer";
+
+      state.ws.onopen = () => {
+        console.info('WebSocket connected');
+        updateStatus('connected', 'Connected');
+        state.isConnecting = false;
+        state.wsRetries = 0;
+      };
+
+      state.ws.onmessage = (event) => {
+        if (typeof event.data === 'object') {
+          if (state.sourceBuffer.updating || state.queue.length > 0) {
+            state.queue.push(event.data);
+          } else {
+            state.sourceBuffer.appendBuffer(event.data);
+            elements.video.play().catch(console.error);
+          }
+        }
+      };
+
+      state.ws.onclose = () => {
+        console.warn('WebSocket disconnected');
+        updateStatus('disconnected', 'Disconnected');
+        state.isConnecting = false;
+        handleReconnection();
+      };
+
+      state.ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        state.isConnecting = false;
+      };
+    }
+
+    // Reconnection logic
+    function handleReconnection() {
+      if (state.wsRetries >= CONFIG.maxRetries) {
+        console.error('Max reconnection attempts reached');
+        updateStatus('disconnected', 'Failed to reconnect');
+        return;
+      }
+
+      state.wsRetries++;
+      updateStatus('connecting', `Reconnecting... (Attempt ${state.wsRetries}/${CONFIG.maxRetries})`);
+
+      setTimeout(() => {
+        if (state.ws?.readyState === WebSocket.CLOSED) {
+          initWebSocket();
+        }
+      }, CONFIG.wsRetryInterval);
+    }
+
+    // MediaSource initialization
+    function initMediaSource() {
+      state.mediaSource = new MediaSource();
+      elements.video.src = URL.createObjectURL(state.mediaSource);
+
+      state.mediaSource.addEventListener('sourceopen', () => {
+        state.sourceBuffer = state.mediaSource.addSourceBuffer(CONFIG.codecString);
+        state.sourceBuffer.mode = 'sequence';
+
+        state.sourceBuffer.addEventListener('update', updateBuffer);
+        state.sourceBuffer.addEventListener('updateend', updateBuffer);
+
+        // Initialize WebSocket connection
+        initWebSocket();
+      });
+    }
+
+    // Check video stall
+    function checkVideoStall() {
+      if (elements.video.currentTime === state.lastVideoTime && !elements.video.paused) {
+        console.warn('Video playback stalled, attempting to resume...');
+        elements.video.play().catch(console.error);
+      }
+      state.lastVideoTime = elements.video.currentTime;
+    }
+
+    // Initialize everything
+    function init() {
+      initMediaSource();
+
+      // Monitor video playback
+      setInterval(checkVideoStall, 5000);
+
+      // Handle page visibility changes
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' &&
+          (!state.ws || state.ws.readyState === WebSocket.CLOSED)) {
+          initWebSocket();
+        }
+      });
+    }
+
+    // Start the application
+    init();
+  })();
+</script>
+</body>
+</html>

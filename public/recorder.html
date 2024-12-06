@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0"
+        name="viewport">
+  <meta content="ie=edge" http-equiv="X-UA-Compatible">
+  <title>Recorder</title>
+  <link href="./styles/base.css" rel="stylesheet">
+</head>
+<body>
+<h1>Recorder</h1>
+<p>
+  <a href="./receiver.html" target="_blank">Receiver</a>
+</p>
+
+
+<div id="status" class="stopped">
+  状态：未录制
+</div>
+
+<div>
+  <button id="startBtn">开始录制</button>
+  <button id="stopBtn" disabled>停止录制</button>
+</div>
+
+<div id="videoContainer">
+  <video
+      id="previewVideo"
+      height="480"
+      width="640"
+      autoplay
+      muted
+      style="outline: 1px solid"
+      controls
+  ></video>
+</div>
+
+<script src="./scripts/ws.js"></script>
+<script>
+  const statusEl = document.getElementById('status');
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const previewVideo = document.getElementById('previewVideo');
+
+  let stream;
+  let mediaRecorder;
+
+  const updateStatus = (isRecording) => {
+    if (isRecording) {
+      statusEl.textContent = '状态：正在录制';
+      statusEl.classList.remove('stopped');
+      statusEl.classList.add('recording');
+
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+    } else {
+      statusEl.textContent = '状态：未录制';
+      statusEl.classList.remove('recording');
+      statusEl.classList.add('stopped');
+
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+    }
+  };
+
+  let testCount = 0;
+
+  const startRecorder = async () => {
+    try {
+      // Capture audio and video streams
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: {
+          width: {max: 100},
+          height: {max: 100},
+          frameRate: {max: 15}
+        },
+      });
+
+      // 显示预览视频
+      previewVideo.srcObject = stream;
+
+      // Create MediaRecorder to encode the media streams
+      mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'video/webm; codecs="vp8, opus"'
+      });
+
+      // When data is available from the MediaRecorder
+      mediaRecorder.ondataavailable = async (event) => {
+        // Send the data chunk over the WebSocket connection
+        if (event.data && event.data.size > 0) {
+          if (socket) {
+            socket.send(event.data);
+
+            if (testCount < 5) {
+              testCount++
+              console.log(testCount, event.data, await  event.data.arrayBuffer())
+            } else {
+              // console.log(`Send data to websocket, size: ${event.data.size}`, event.data);
+            }
+          } else {
+            console.error('socket not open');
+          }
+        }
+      };
+
+      // Start recording the media streams
+      mediaRecorder.start(1000);
+
+      // 更新状态
+      updateStatus(true);
+    } catch (error) {
+      console.error('启动录制失败:', error);
+      alert('无法访问摄像头或麦克风');
+      updateStatus(false);
+    }
+  };
+
+  const stopRecorder = () => {
+    // Stop recording if mediaRecorder exists and is recording
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+    }
+
+    // Stop all tracks in the stream
+    if (stream) {
+      stream.getTracks().forEach(track => {
+        track.stop();
+      });
+    }
+
+    // 清除预览视频
+    previewVideo.srcObject = null;
+
+    // Reset stream and mediaRecorder
+    stream = null;
+    mediaRecorder = null;
+
+    // 更新状态
+    updateStatus(false);
+  };
+
+  // 绑定按钮事件
+  startBtn.addEventListener('click', startRecorder);
+  stopBtn.addEventListener('click', stopRecorder);
+
+  startRecorder();
+</script>
+</body>
+</html>

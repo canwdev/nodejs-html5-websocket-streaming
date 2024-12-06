@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0"
+        name="viewport">
+  <meta content="ie=edge" http-equiv="X-UA-Compatible">
+  <title>Broadcaster</title>
+  <link href="./styles/base.css" rel="stylesheet">
+</head>
+<body>
+<h1>Receiver</h1>
+<p>
+  <a href="./recorder.html" target="_blank">Recorder</a>
+</p>
+
+
+<video
+    id="video"
+    height="480"
+    width="640"
+    muted
+    style="outline: 1px solid"
+    controls
+></video>
+
+<script src="./scripts/ws.js"></script>
+<script>
+
+  let mediaSource = null;
+  let sourceBuffer = null;
+  let isInitialized = false;
+
+  const initMediaSource = () => {
+    // 如果已经存在，先清理
+    if (mediaSource) {
+      URL.revokeObjectURL(video.src);
+    }
+
+    // 重新创建 MediaSource
+    mediaSource = new MediaSource();
+    video.src = URL.createObjectURL(mediaSource);
+
+    // When the MediaSource is successfully opened
+    mediaSource.addEventListener('sourceopen', () => {
+      console.log('MediaSource opened');
+      sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs="vp8, opus"');
+      // sourceBuffer.mode = 'sequence';
+
+      // When the SourceBuffer has enough data to start playing
+      sourceBuffer.addEventListener('updateend', () => {
+        console.log('MediaSource updated');
+        // If the video element is not already playing, start playing it
+        if (video.paused) {
+          video.play();
+        }
+      });
+
+      sourceBuffer.addEventListener('error', (event) => {
+        console.error('SourceBuffer error:', event);
+        // 重新初始化
+        initMediaSource();
+      });
+
+    })
+
+
+    mediaSource.addEventListener('sourceclose', () => {
+      console.warn('MediaSource closed');
+      initMediaSource();
+    });
+
+    isInitialized = true;
+  }
+
+  initMediaSource()
+
+  socket.onmessage = (event) => {
+    if (mediaSource.readyState === 'open') {
+      console.log('Received', event);
+      const arrayU8 = new Uint8Array(event.data);
+      sourceBuffer.appendBuffer(arrayU8);
+    } else {
+      console.warn('Media source is not in open state: ', mediaSource.readyState);
+    }
+  }
+</script>
+</body>
+</html>
