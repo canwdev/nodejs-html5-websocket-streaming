@@ -2,6 +2,13 @@
 
 > 基于 `libffmpeg_264_265` 的视频裸流（raw stream）播放器，视频测试文件下载 .h264, .265 文件：https://gitee.com/wupeng-engineer/decoder_wasm/tree/master/test
 
+## 运行 Demo
+
+```shell
+npm install
+npm run start
+```
+
 ## 描述
 
 - 使用 Web Worker 实现:

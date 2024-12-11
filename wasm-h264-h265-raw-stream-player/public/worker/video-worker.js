@@ -11,7 +11,7 @@ self.Module = {
 };
 importScripts("libffmpeg_264_265.js");
 importScripts("common.js");
-importScripts('webgl.js')
+// importScripts('webgl.js')
 
 var decoder_type
 var videoSize = 0;
@@ -41,7 +41,7 @@ const initDecoder = (payload) => {
   let lastCbTimestamp = performance.now()
   var videoCallback = Module.addFunction((addr_y, addr_u, addr_v, stride_y, stride_u, stride_v, width, height, pts) => {
 
-    performanceTimeStart('performance:videoCallback');
+    // performanceTimeStart('performance:videoCallback');
 
     // 预计算尺寸
     const ySize = width * height;
@@ -100,11 +100,11 @@ const initDecoder = (payload) => {
     //   timestamp: Date.now()
     // },);
     renderFrame(obj)
-    performanceTimeEnd('performance:videoCallback');
+    // performanceTimeEnd('performance:videoCallback');
 
-    const diffTs = performance.now() - lastCbTimestamp
-    console.log('performance:距离上一帧的间隔', diffTs + 'ms')
-    lastCbTimestamp = performance.now()
+    // const diffTs = performance.now() - lastCbTimestamp
+    // console.log('performance:距离上一帧的间隔', diffTs + 'ms')
+    // lastCbTimestamp = performance.now()
   }, 'viiiiiiiii');
 
   var ret = Module._openDecoder(decoder_type, videoCallback, LOG_LEVEL_WASM)
@@ -118,7 +118,7 @@ const initDecoder = (payload) => {
 
 
 const decodeData = (payload) => {
-  performanceTimeStart('performance:decodeData_task_sent');
+  // performanceTimeStart('performance:decodeData_task_sent');
   var typedArray = new Uint8Array(payload);
   var size = typedArray.length
   var cacheBuffer = Module._malloc(size);
@@ -136,7 +136,7 @@ const decodeData = (payload) => {
     Module._flushDecoder();
     Module._closeDecoder();
   }
-  performanceTimeEnd('performance:decodeData_task_sent');
+  // performanceTimeEnd('performance:decodeData_task_sent');
 }
 
 const decodeDataQueue = []
@@ -157,29 +157,38 @@ const startDecodeQueue = async () => {
 let webglPlayer
 
 function renderFrame(currentFrame) {
-  const data = new Uint8Array(currentFrame.data)
-  const width = currentFrame.width
-  const height = currentFrame.height
-  const yLength = width * height
-  const uvLength = (width / 2) * (height / 2)
-  if (!webglPlayer) {
-    canvas.width = width
-    canvas.height = height
-    webglPlayer = new WebGLPlayer(canvas)
-  }
-
-  const gl = webglPlayer.renderFrame(data, width, height, yLength, uvLength)
-
-  // 发送到主线程
-  const bitmap = gl.canvas.transferToImageBitmap();
   self.postMessage({
-    type: 'frameRendered',
+    type: 'renderFrame',
     payload: {
-      bitmap,
-      width,
-      height,
+      data: currentFrame.data.buffer,
+      width: currentFrame.width,
+      height: currentFrame.height,
     }
-  }, [bitmap]);
+  }, [currentFrame.data.buffer]);
+
+  // const data = new Uint8Array(currentFrame.data)
+  // const width = currentFrame.width
+  // const height = currentFrame.height
+  // const yLength = width * height
+  // const uvLength = (width / 2) * (height / 2)
+  // if (!webglPlayer) {
+  //   canvas.width = width
+  //   canvas.height = height
+  //   webglPlayer = new WebGLPlayer(canvas)
+  // }
+  //
+  // const gl = webglPlayer.renderFrame(data, width, height, yLength, uvLength)
+
+  // // 发送到主线程
+  // const bitmap = gl.canvas.transferToImageBitmap();
+  // self.postMessage({
+  //   type: 'frameRendered',
+  //   payload: {
+  //     bitmap,
+  //     width,
+  //     height,
+  //   }
+  // }, [bitmap]);
 }
 
 

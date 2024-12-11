@@ -4,7 +4,7 @@ var worker = new Worker('worker/video-worker.js');
 const canvasOffscreen = document.createElement('canvas').transferControlToOffscreen()
 
 const canvas = document.getElementById('playCanvas')
-const ctx = canvas.getContext('2d');
+// const ctx = canvas.getContext('2d');
 
 const statusDisplay = document.getElementById('statusDisplay')
 const statusDisplayFreq = document.getElementById('statusDisplayFreq')
@@ -18,7 +18,15 @@ worker.onmessage = (event) => {
     payload,
     timestamp
   } = event.data;
-  if (type === 'frameRendered') {
+  // if (type === 'frameRendered') {
+  //   // if (timestamp) {
+  //   //   console.log('om_timestamp', Date.now() - timestamp + 'ms');
+  //   // }
+  //   // console.log('frameRendered', payload)
+  //
+  //   addVideoQueue(payload);
+  // }
+  if (type === 'renderFrame') {
     // if (timestamp) {
     //   console.log('om_timestamp', Date.now() - timestamp + 'ms');
     // }
@@ -138,6 +146,7 @@ const frameQueue = []
 let isPlaying = false
 
 let lastFrameTime = 0
+let webglPlayer
 
 const fpsMonitor = new PerformanceMonitor();
 let totalFrameCount = 0
@@ -162,7 +171,21 @@ function renderLoop(currentTime) {
       return
     }
 
-    ctx.drawImage(currentFrame, 0, 0);
+    const data = new Uint8Array(currentFrame.data)
+    const width = currentFrame.width
+    const height = currentFrame.height
+    const yLength = width * height
+    const uvLength = (width / 2) * (height / 2)
+    if (!webglPlayer) {
+      canvas.width = width
+      canvas.height = height
+      webglPlayer = new WebGLPlayer(canvas)
+    }
+
+    webglPlayer.renderFrame(data, width, height, yLength, uvLength)
+
+    // ctx.drawImage(currentFrame, 0, 0);
+
     totalFrameCount++
 
     // FPS 计算
@@ -197,7 +220,9 @@ frameQueue.length: ${frameQueue.length}`
 function addVideoQueue(payload) {
   // console.log('[addVideoQueue]', payload)
   // 将当前帧加入队列
-  frameQueue.push(payload.bitmap)
+  frameQueue.push(payload)
+
+  // frameQueue.push(payload.bitmap)
   updateFreqDisplay()
 
 
@@ -216,3 +241,26 @@ CHUNK_SIZE: ${CHUNK_SIZE}`
     requestAnimationFrame(renderLoop)
   }
 }
+
+// function addVideoQueue(payload) {
+//   // console.log('[addVideoQueue]', payload)
+//   // 将当前帧加入队列
+//   frameQueue.push(payload.bitmap)
+//   updateFreqDisplay()
+//
+//
+//   // 如果还没开始播放，启动渲染循环 && frameQueue.length >= TARGET_FPS
+//   if (!isPlaying && frameQueue.length >= TARGET_FPS * (2 / 3)) {
+//     // console.log('[addVideoQueue] play trigger',)
+//
+//     canvas.width = payload.width;
+//     canvas.height = payload.height;
+//
+//     statusDisplay.innerText = `Size: ${payload.width}x${payload.height}
+// Target FPS: ${TARGET_FPS}
+// CHUNK_SIZE: ${CHUNK_SIZE}`
+//
+//     isPlaying = true
+//     requestAnimationFrame(renderLoop)
+//   }
+// }

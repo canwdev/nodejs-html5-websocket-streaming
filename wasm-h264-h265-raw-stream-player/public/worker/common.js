@@ -76,15 +76,41 @@ class PerformanceMonitor {
   }
 }
 // 通用节流函数
-function throttle(fn, delay) {
+function throttle(fn, delay, options = {}) {
   let lastTime = 0;
+  let timer = null;
+  const {
+    leading = true,    // 是否立即执行第一次
+    trailing = true    // 是否执行最后一次
+  } = options;
 
-  return function(...args) {
+  return function throttled(...args) {
     const now = Date.now();
 
-    if (now - lastTime >= delay) {
+    // 第一次是否执行
+    if (lastTime === 0 && !leading) {
+      lastTime = now;
+    }
+
+    const remaining = delay - (now - lastTime);
+
+    // 清除之前的定时器
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+
+    if (remaining <= 0) {
+      // 已经超过延迟时间，立即执行
       fn.apply(this, args);
       lastTime = now;
+    } else if (trailing) {
+      // 设置定时器确保最后一次调用执行
+      timer = setTimeout(() => {
+        fn.apply(this, args);
+        lastTime = leading ? Date.now() : 0; // 重置 lastTime
+        timer = null;
+      }, remaining);
     }
   };
 }
