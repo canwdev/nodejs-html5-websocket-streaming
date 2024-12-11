@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Decoder</title>
+  <style>
+    body {
+      margin: 0;
+    }
+    .canvas-wrapper {
+      width: 95vw;
+      height: 80vh;
+      outline: 1px dashed;
+      canvas {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+    }
+    .status-wrapper {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      pre {
+        border: 1px solid #b7b7b7;
+        padding: 10px;
+        margin: 5px;
+      }
+    }
+  </style>
+</head>
+<body>
+    <div style="margin: 20px;">
+      H264:
+        <input type="file" onchange="handleVideoFiles(this.files)" onclick="setDecoder(0)">
+    </div>
+    <div style="margin: 20px;">
+      H265:
+        <input type="file" onchange="handleVideoFiles(this.files)" onclick="setDecoder(1)">
+    </div>
+
+    <div class="canvas-wrapper">
+      <canvas id="playCanvas"></canvas>
+    </div>
+
+    <div class="status-wrapper">
+    <pre id="statusDisplay"></pre>
+    <pre id="statusDisplayFreq"></pre>
+    </div>
+
+  <script src="worker/common.js"></script>
+  <!--<script src="./wasm/libffmpeg_264_265.js"></script>-->
+  <!--<script src="worker/webgl.js"></script>-->
+  <script src="video.js"></script>
+
+</body>
+</html>

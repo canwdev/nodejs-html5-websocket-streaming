@@ -23,12 +23,18 @@
 - 打开前端网页：`tcp-ws-receiver.html`
 - 运行：`.\ffmpeg.exe -re -stream_loop -1 -i sd.mp4 -vcodec libvpx -b:v 3500k -r 25 -crf 10 -quality realtime -speed 16 -threads 8 -an -g 25 -f webm tcp://localhost:9090` 开始推流
 
-## TODO: Bug
+### Demo 1, 2: Bug
 
 - 客户端在第一次读取的推流的第一部分才能正常播放，否则，刷新或在推流的中途打开客户端，则无法正常播放，会报错：`SourceBuffer error`
   - 待解决，猜测是以下原因：
   - WebM 容器格式需要正确的头部信息(initialization segment)才能开始解码
   - 判断是否是I帧，只有关键帧才能播放
+
+## Demo 3: wasm h264/h265 raw stream player
+
+> 基于 libffmpeg_264_265 的视频裸流（raw stream）播放器
+
+子文件夹 [wasm-h264-h265-raw-stream-player](./wasm-h264-h265-raw-stream-player/README.md)
 
 ## Reference
 
